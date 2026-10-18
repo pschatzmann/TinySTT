@@ -1,0 +1,3 @@
+turn on the light
+stop the fan
+go|turn off the fan

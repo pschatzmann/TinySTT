@@ -1,0 +1,13 @@
+<s> turn -1.258000
+turn on -0.750000
+on the -0.345000
+the light -1.460000
+light </s> -0.345000
+the kitchen -2.416000
+hello world -1.386000
+world stop -4.438000
+timer for -0.288000
+for two -2.485000
+for too -5.230000
+<s> minutes -4.487000
+bedroom <unk> -4.382000

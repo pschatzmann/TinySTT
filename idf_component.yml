@@ -1,0 +1,9 @@
+version: "0.1.0"
+description: "Header-only speech-to-text (CTC phoneme model + lexicon/LM decoder) for ESP32, split into Speech-to-Phonemes and Phonemes-to-Text."
+url: "https://github.com/pschatzmann/TinySTT"
+repository: "https://github.com/pschatzmann/TinySTT.git"
+license: "Apache-2.0"
+targets:
+  - esp32
+  - esp32s3
+  - esp32p4
