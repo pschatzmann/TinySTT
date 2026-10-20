@@ -1,7 +1,7 @@
 # Status and limitations
 
-- **Accuracy:** the shipped model reaches 36 % WER on LibriSpeech test-clean
-  (beam 16; 33 % at beam 32). That's fine for commands with a grammar, not yet
+- **Accuracy:** the shipped model reaches 33 % WER on LibriSpeech test-clean
+  (beam 32, the default; 36 % at beam 16). That's fine for commands with a grammar, not yet
   for reliable dictation. See [`training.md`](training.md) for the most
   promising improvements (more training data, a larger LM).
 - English only (CMUdict phonemes). Other languages need a phoneme set, a

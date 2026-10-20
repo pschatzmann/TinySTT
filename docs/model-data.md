@@ -38,6 +38,13 @@ ModelPartition partition;
 partition.begin(model, "tinystt");
 ```
 
+The shipped model is also available as a PROGMEM array:
+`#include "TinySTT/data/tinystt_model_data.h"`, then
+`model.begin(tinystt_model_data, tinystt_model_data_len)`. It adds 3.1 MB to
+the program (on ESP32 it is used in place from flash; choose a partition
+scheme with a large app partition). `research/export_header.py` writes such a
+header for any container.
+
 `begin()` checks magic, version, sizes and the CRC. Pass `verifyCrc = false`
 for trusted memory-mapped flash to skip the scan.
 

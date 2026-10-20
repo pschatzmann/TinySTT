@@ -6,8 +6,10 @@ namespace tinystt {
 /**
  * @brief Energy based endpointing on top of audio-tools' VolumeMeter. Fed with
  * one 10 ms block at a time; reports speech start after `start_ms` above
- * `start_db` and speech end after `hangover_ms` below `stop_db` (or when an
- * utterance exceeds `max_utterance_ms`).
+ * `start_db` and speech end after `hangover_ms` below `stop_db`. An utterance
+ * longer than `max_utterance_ms` ends at its next short pause
+ * (`split_pause_ms`), so it is not cut in the middle of a word; only at
+ * `hard_max_utterance_ms` it is cut unconditionally.
  */
 class VAD {
  public:
@@ -18,7 +20,9 @@ class VAD {
     float stop_db = -40.0f;       ///< below this counts as silence
     uint32_t start_ms = 30;       ///< speech needed to start an utterance
     uint32_t hangover_ms = 600;   ///< silence needed to end it
-    uint32_t max_utterance_ms = 15000;
+    uint32_t max_utterance_ms = 15000;       ///< then end at the next short pause
+    uint32_t split_pause_ms = 60;            ///< pause that ends a long utterance
+    uint32_t hard_max_utterance_ms = 30000;  ///< cut unconditionally
   };
 
   Config& config() { return cfg; }
@@ -52,7 +56,8 @@ class VAD {
     }
     speech_ms += ms;
     below_ms = last_db < cfg.stop_db ? below_ms + ms : 0;
-    if (below_ms >= cfg.hangover_ms || speech_ms >= cfg.max_utterance_ms) {
+    bool long_pause = speech_ms >= cfg.max_utterance_ms && below_ms >= cfg.split_pause_ms;
+    if (below_ms >= cfg.hangover_ms || long_pause || speech_ms >= cfg.hard_max_utterance_ms) {
       in_speech = false;
       above_ms = 0;
       return SpeechEnd;

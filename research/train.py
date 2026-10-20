@@ -367,6 +367,7 @@ def main():
         loader = torch.utils.data.DataLoader(train_ds, batch_sampler=length_batches(train_items, args.batch_bytes),
                                              collate_fn=collate, num_workers=args.workers)
         t0, loss_sum, n = time.time(), 0.0, 0
+        cut = False
         for x, x_len, y, y_len in loader:
             x = x.to(device)
             logp = qat_forward(model, x) if qat else model(x)
@@ -380,6 +381,16 @@ def main():
                 sched.step()
             loss_sum += loss.item()
             n += 1
+            if args.max_hours and n % 50 == 0:
+                # epochs on large data sets are long: check the budget within
+                # the epoch too and keep room for the QAT epochs and the export
+                per_epoch = (time.time() - t0) / n * steps_per_epoch
+                left = args.max_hours * 3600 - (time.time() - t_start)
+                need = 0.0 if qat else per_epoch * args.qat_epochs
+                if left < need + 900:
+                    print(f"time limit: epoch {epoch} ends after {n}/{steps_per_epoch} batches", flush=True)
+                    cut = True
+                    break
             if args.log_every and n % args.log_every == 0:
                 el = time.time() - t0
                 print(f"  epoch {epoch} batch {n}/{steps_per_epoch}: loss {loss_sum / n:.3f}, "
@@ -396,6 +407,14 @@ def main():
         if per < best or (qat and epoch == end_epoch - 1):
             best = min(best, per)
             torch.save(ck, os.path.join(args.out, "best.pt"))
+        if cut and not qat and args.qat_epochs > 0:
+            # continue directly with the QAT epochs at a low learning rate
+            end_epoch = epoch + 1 + args.qat_epochs
+            use_sched = False
+            for g in opt.param_groups:
+                g["lr"] = args.lr * 0.05
+        elif cut:
+            end_epoch = epoch + 1
         epoch += 1
     export(os.path.join(args.out, "best.pt"), os.path.join(args.out, "model.tstt"))
 

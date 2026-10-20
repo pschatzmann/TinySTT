@@ -122,7 +122,7 @@ TEST(decoder_history_stays_bounded) {
   }
   std::printf("  %zu words, at most %zu history nodes\n", r.nbest.empty() ? (size_t)0 : r.nbest[0].words.size(), max_nodes);
   CHECK(!r.nbest.empty() && r.nbest[0].words.size() >= 140);
-  CHECK(max_nodes < 1024);
+  CHECK(max_nodes < 2048);  // beam 32
 }
 
 TEST(decoder_partial_results) {

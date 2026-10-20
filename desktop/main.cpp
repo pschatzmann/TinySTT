@@ -48,7 +48,7 @@ struct Options {
   std::vector<std::pair<std::string, float>> hotwords;
   bool phonemes_only = false, from_phonemes = false, text_phonemes = false, mic = false;
   bool no_vad = false, verbose = false;
-  int nbest = 1, beam = 16;
+  int nbest = 1, beam = 32;
   float lm_weight = -1.0f, word_bonus = -1000.0f;
   int word_end_beam = -1;  // < defaults: keep the decoder defaults
   float blank_threshold = 0.95f, min_confidence = 0.0f;
@@ -64,8 +64,8 @@ static void usage() {
           "  --grammar TEXT        command grammar, e.g. \"turn (on|off) the (light|fan)\"\n"
           "  --words a,b,c         only recognize these words (word-list mode)\n"
           "  --hotword WORD[:B]    boost a word (log bonus B, default 3)\n"
-          "  --nbest N             print N hypotheses with confidences\n"
-          "  --beam N              beam size (default 16)\n"
+          "  --nbest N             print N hypotheses: confidence, score, text\n"
+          "  --beam N              beam size (default 32)\n"
           "  --word-end-beam N     word boundary hypotheses always kept (default 8)\n"
           "  --lm-weight W         language model weight\n"
           "  --word-bonus B        word insertion bonus\n"
@@ -146,7 +146,8 @@ static void printResult(const SttResult& r, void*) {
   if (g_opt.nbest <= 1) {
     printf("%s\n", r.text());
   } else {
-    for (auto& h : r.nbest) printf("%.3f\t%s\n", h.confidence, h.text.c_str());
+    // confidence, total log score (acoustic + LM + bonuses), text
+    for (auto& h : r.nbest) printf("%.3f\t%.3f\t%s\n", h.confidence, h.score, h.text.c_str());
     printf("\n");
   }
   fflush(stdout);

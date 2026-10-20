@@ -35,7 +35,7 @@ ctest --test-dir build --output-on-failure
 
 ```bash
 tinystt --model data/tinystt.tstt speech.wav             # any WAV, converted to 16 kHz mono
-tinystt --model data/tinystt.tstt --nbest 3 speech.wav   # N-best with confidences
+tinystt --model data/tinystt.tstt --nbest 3 speech.wav   # N-best: confidence, score, text
 tinystt --model data/tinystt.tstt --grammar "turn (on|off) the (light|fan)" speech.wav
 tinystt --model data/tinystt.tstt --words yes,no,stop speech.wav
 tinystt --model data/tinystt.tstt --hotword Schatzmann:4 speech.wav

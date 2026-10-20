@@ -82,7 +82,7 @@ class STTPipeline {
   bool startDecoderTask(int stackSize = 16 * 1024, int priority = 1, int core = 0) {
     stop_requested = false;
     decoder_running = startTask(consumer, "tinystt-decoder", stackSize, priority, core, consumer_parked, [this] {
-      if (ptt.copy() == 0) delay(1);
+      if (ptt.copy(kDecoderMessages) == 0) delay(1);
     });
     return decoder_running;
   }
@@ -103,8 +103,8 @@ class STTPipeline {
       }
       delay(1);
     }
-    if (tasks_running) producer.end();
-    if (decoder_running) consumer.end();
+    if (tasks_running) suspendTask(producer);
+    if (decoder_running) suspendTask(consumer);
     tasks_running = decoder_running = false;
   }
 
@@ -123,9 +123,24 @@ class STTPipeline {
   Stream* p_audio = nullptr;
   bool tasks_running = false;
   bool decoder_running = false;
+  static constexpr uint32_t kMaxBusyMs = 50;  ///< longest time a task runs without yielding
+  static constexpr size_t kDecoderMessages = 16;  ///< queue messages per decoder task step
   std::atomic<bool> stop_requested{false};
   std::atomic<bool> producer_parked{false};
   std::atomic<bool> consumer_parked{false};
+
+  /// Suspends the task and waits until it really is suspended: suspending a
+  /// task that runs on the other core can return before that core switched
+  /// it out, and Task::begin() then replaces the std::function the task may
+  /// still be calling (crash on the ESP32-P4).
+  static void suspendTask(audio_tools::Task& task) {
+    task.end();
+#if defined(ESP32) || (defined(USE_FREERTOS) && !defined(USE_CPP_TASK))
+    TaskHandle_t h = task.getTaskHandle();
+    uint32_t start = millis();
+    while (h != nullptr && eTaskGetState(h) != eSuspended && millis() - start < 1000) delay(1);
+#endif
+  }
 
   /// Creates the task if it does not exist yet (an existing, stopped task is
   /// resumed) and runs `step` until stopTasks()
@@ -136,8 +151,12 @@ class STTPipeline {
     // FreeRTOS outside ESP-IDF takes the stack depth in words, not bytes
     stackSize /= (int)sizeof(StackType_t);
 #endif
-    if (task.isEnded() && !task.create(name, stackSize, priority, core)) return false;
-    return task.begin([this, &parked, step] {
+    if (task.isEnded()) {
+      if (!task.create(name, stackSize, priority, core)) return false;
+      suspendTask(task);  // create() starts the task and then suspends it
+    }
+    uint32_t last_yield = millis();
+    return task.begin([this, &parked, step, last_yield]() mutable {
       if (stop_requested) {  // park at a safe point until suspended
         parked = true;
         delay(5);
@@ -145,6 +164,12 @@ class STTPipeline {
       }
       parked = false;
       step();
+      // a task that always has work (e.g. a decoder slower than real time)
+      // must still let the idle task run, or the task watchdog resets
+      if (millis() - last_yield >= kMaxBusyMs) {
+        delay(1);
+        last_yield = millis();
+      }
     });
   }
 #endif

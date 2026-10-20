@@ -47,11 +47,12 @@ class PhonemesToText {
   /// Prints final, accepted results as text lines
   void setOutput(Print& out) { p_out = &out; }
 
-  /// Drains the queue; returns the number of messages processed
-  size_t copy() {
+  /// Processes the queued messages (at most maxMessages, 0: all); returns
+  /// the number processed
+  size_t copy(size_t maxMessages = 0) {
     size_t n = 0;
     PhonemeFrame f;
-    while (p_queue->read(f)) {
+    while ((maxMessages == 0 || n < maxMessages) && p_queue->read(f)) {
       dec.write(f);
       n++;
     }

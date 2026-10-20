@@ -8,6 +8,7 @@
 #include "NaiveDFT.h"
 #include "TestUtil.h"
 #include "TinySTT/FeatureExtractor.h"
+#include "TinySTT/VAD.h"
 
 using namespace tinystt;
 using FE = FeatureExtractor;
@@ -211,6 +212,35 @@ TEST(features_reset_restarts_framing) {
   CHECK_EQ(fe.frameCount(), 0u);
   fe.write((const uint8_t*)pcm.data(), 400 * 2);  // < one window
   CHECK_EQ(fe.frameCount(), 0u);
+}
+
+/// feeds 10 ms blocks of a tone (or silence); returns the time (ms) of SpeechEnd, 0 if none
+static uint32_t vadEndMs(VAD& vad, const std::vector<std::pair<uint32_t, bool>>& segments) {
+  int16_t block[160];
+  uint32_t t = 0;
+  for (auto& seg : segments) {
+    for (uint32_t ms = 0; ms < seg.first; ms += 10, t += 10) {
+      for (int j = 0; j < 160; j++) block[j] = seg.second ? (int16_t)(8000 * sinf(2 * PI * 300 * j / 16000.0f)) : 0;
+      if (vad.update(block, 160) == VAD::SpeechEnd) return t + 10;
+    }
+  }
+  return 0;
+}
+
+TEST(vad_long_utterance_ends_at_pause) {
+  VAD vad;
+  vad.begin();
+  // 16 s of speech, a 100 ms pause, more speech: ends in the pause, not at 15 s
+  uint32_t end = vadEndMs(vad, {{16000, true}, {100, false}, {5000, true}});
+  std::printf("  speech end at %u ms\n", (unsigned)end);
+  CHECK(end > 16000 && end <= 16100);
+}
+
+TEST(vad_hard_limit) {
+  VAD vad;
+  vad.begin();
+  uint32_t end = vadEndMs(vad, {{40000, true}});  // no pause at all
+  CHECK(end > 0 && end <= vad.config().hard_max_utterance_ms + 50);
 }
 
 TEST_MAIN()

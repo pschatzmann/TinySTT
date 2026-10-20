@@ -237,9 +237,11 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done (tests green)
   - `Hann` window formula. |
 | Desktop benchmark | [x] | `tinystt_benchmark`: stage 1 0.020 RTF on an i7-4650U |
 | `PhonemeOutput` | [x] | Human readable output of step 1 (default `Serial`): phoneme sequence per utterance or every frame; `examples/stt_phonemes`; tests in `test_queue` / `test_pipeline`; verified on the ESP32-S3 |
-| Beam / top-k tuning | [x] | `word_end_beam` (word-boundary quota), LM weight 0.5, word bonus 0: test-clean WER 61.9 % → 31.9 % (100 utt.); full test-clean 36.0 % (beam 16) / 32.7 % (beam 32) |
+| Beam / top-k tuning | [x] (default beam 32 since 2026-10-18) | `word_end_beam` (word-boundary quota), LM weight 0.5, word bonus 0: test-clean WER 61.9 % → 31.9 % (100 utt.); full test-clean 36.0 % (beam 16) / 32.7 % (beam 32) |
 | Trained model | [x] | Kaggle v6 (corrected Hann): 30 epochs, dev PER 17.3 %, test PER 14.8 %; shipped as `data/tinystt.tstt` (3.1 MB) |
 | RP2350 | [x] | Cortex-M33 DSP kernel, placement (384 KB internal + PSRAM), no-task fallback / FreeRTOS task; stage 1 0.92 RTF at 150 MHz; self-test PASS; `docs/platform-rp2350.md`. Hang fixed (model buffers allocated before the weight placement; decoder word history pruned) and verified with the trained model: complete pipeline 0.97 RTF without OS and with a 48 KB reserve, 1.57 RTF with FreeRTOS; decoder task on core 1 |
+| Decoder memory and tasks | [x] | Word history pruned (bounded by the beam, `decoder_history_stays_bounded`); decoder task yields at least every 50 ms and processes at most 16 messages per step (a decoder slower than real time triggered the ESP32 task watchdog); FreeRTOS stack depth in words outside ESP-IDF; RP2040 decoder task on core 1 |
+| WER improvements | [~] | Default beam 32 (36.0 % → 32.7 %). Larger lexicon + LibriSpeech LM (`arpa_to_lm.py`): 9.5 MB container 24.7 % at beam 64 (100 utt.), 29.8 % on full test-clean (vs 32.7 %), runs on S3/P4 from flash. N-best trigram rescoring (SD idea): only −0.8 points, not pursued. VAD: no WER cost (an earlier 3-point loss was a measurement error); long utterances now end at a pause (`split_pause_ms`, hard limit 30 s). Retraining on train-clean-100 + 360 with the LibriSpeech lexicon (Kaggle v7): in progress |
 | Raspberry Pi | [x] | NEON kernel, `TINYSTT_NATIVE` (`-mcpu=native`); Pi 4 stage 1 0.016 RTF, same WER as x86; `docs/platform-raspberry-pi.md` |
 
 ## Measurements
@@ -256,4 +258,6 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done (tests green)
 | 2026-10-18 | ESP32-S3 240 MHz | trained (Kaggle v6) | same transcript as x86 | complete pipeline 0.44 | `TinySTT`, 10.4 s LibriSpeech utterance, model in the flash partition |
 | 2026-10-18 | ESP32-P4 400 MHz rev 3.2 | trained (Kaggle v6) | same transcript as x86 | complete pipeline 0.16 | `TinySTT`, 10.4 s LibriSpeech utterance, model in the flash partition |
 | 2026-10-18 | RP2350 150 MHz, 8 MB PSRAM | trained (Kaggle v6) | same transcript as x86 | complete pipeline 0.97 (no OS, reserve 48 KB), 1.23 (default reserve), 1.57 (FreeRTOS) | `TinySTT`, 10.4 s LibriSpeech utterance |
+| 2026-10-18 | x86 desktop | trained (v6) + 50 k lexicon + LibriSpeech bigram (9.5 MB) | 24.7 % (100 utt., beam 64) | – | `research/eval_wer.py` |
+| 2026-10-18 | ESP32-S3 / ESP32-P4 | trained (v6) + 9.5 MB container | improved transcript | complete pipeline beam 64: 0.51 / 0.16 | in place from the flash partition |
 | 2026-10-18 | Raspberry Pi 4, 32-bit OS | production shape / trained | 31.9 % (100 utt., same as x86) | stage 1 0.016, decoder 0.0022 | NEON, `-mcpu=native` |

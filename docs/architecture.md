@@ -18,7 +18,7 @@ two devices.
 
 | Component | File | What it does |
 |---|---|---|
-| `VAD` | `src/TinySTT/VAD.h` | audio-tools' `VolumeMeter` on each 10 ms block, with start, hangover and maximum-length logic. While silent, only features are computed. The last 30 frames (300 ms) are replayed when speech starts, so the onset is not lost. |
+| `VAD` | `src/TinySTT/VAD.h` | audio-tools' `VolumeMeter` on each 10 ms block, with start, hangover and maximum-length logic (after 15 s an utterance ends at its next short pause, after 30 s unconditionally). While silent, only features are computed. The last 30 frames (300 ms) are replayed when speech starts, so the onset is not lost. |
 | `FeatureExtractor` | `src/TinySTT/FeatureExtractor.h` | Uses the **caller's** `AudioFFTBase` object (`AudioRealFFT`, `AudioEspressifFFT`, ...). 512-point frames with a 160-sample hop, audio-tools `Hann` window (cached by `BufferedWindow`), then `toMEL(80, 0, 8000, power)`, `ln(x + 1e-6)` and the global mean/std normalization from the container. |
 | `AcousticModel` | `src/TinySTT/AcousticModel.h` | Causal conv1d (kernel 5, stride 3) + ReLU → 2 × GRU(256) → linear → log-softmax over 41 classes (blank, silence, 39 ARPAbet phonemes). One output every 30 ms. The default precision is int8 weights with int8 activations, with a per-platform dot-product kernel: esp-nn SIMD (ESP32-S3), PIE SIMD (ESP32-P4), DSP `SMLAD` (RP2350 / Cortex-M33), NEON (ARM Linux), otherwise an unrolled portable loop. Weights can be placed in PSRAM / internal RAM, and n frames can be batched per pass (see [`performance.md`](performance.md)). |
 | `FrameBuilder` | `src/TinySTT/FrameBuilder.h` | Keeps the top-k (≤ 4) classes per frame with int8 log-probabilities. It merges near-certain blanks (P > 0.95) into one `BlankRun` message, which removes most of the traffic. |
@@ -69,6 +69,10 @@ acoustics therefore lower it, even when one path dominates the beam.
 Grammars and words added before `begin()` are applied in `begin()`, once the
 dictionary is loaded, so they get its pronunciations. A grammar's syntax is
 checked immediately.
+
+The tasks yield at least every 50 ms, and the decoder task handles at most 16
+queue messages per step, so a decoder that falls behind (e.g. a very wide
+beam) does not starve the idle task and trip the watchdog.
 
 `end()` stops the tasks cooperatively. Each task finishes its current step
 and parks before it is suspended, so it is never stopped inside an

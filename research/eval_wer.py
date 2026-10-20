@@ -46,13 +46,14 @@ def main():
     ap.add_argument("--max-items", type=int, default=0)
     ap.add_argument("--args", default="", help="extra CLI options, e.g. '--beam 32'")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--vad", action="store_true", help="keep the voice activity detector on (default: off)")
     args = ap.parse_args()
     errors = total = n = 0
     with open(args.manifest, encoding="utf-8") as f:
         for line in f:
             path, text = line.rstrip("\n").split("\t", 1)
             ref = normalize_words(text)
-            cmd = [args.cli, "--model", args.container, "--no-vad"] + args.args.split() + ["-"]
+            cmd = [args.cli, "--model", args.container] + ([] if args.vad else ["--no-vad"]) + args.args.split() + ["-"]
             out = subprocess.run(cmd, input=load_pcm16k(path), capture_output=True, check=True).stdout
             hyp = normalize_words(out.decode(errors="replace"))
             e = edit_distance(ref, hyp)

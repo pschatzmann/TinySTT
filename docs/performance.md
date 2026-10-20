@@ -41,7 +41,10 @@ All of them run both stages faster than real time on one core. With
 ### Features
 
 The FFT is passed in as an object. On the ESP32-S3 and P4, `AudioRealFFT`
-measured faster than `AudioEspressifFFT`. Improvements made in audio-tools:
+measured faster than `AudioEspressifFFT` (Waveshare ESP32-P4-WIFI6, features
+for 5 s of audio: 201 ms vs 262 ms). The two do not give the same features
+either (log-mel values differ by up to 1.4, the spectrum scaling differs), and
+the model is trained on `AudioRealFFT` features. Improvements made in audio-tools:
 
 | Improvement | Effect (ESP32-S3) |
 |---|---|
@@ -78,8 +81,8 @@ The shipped model (`data/tinystt.tstt`), on LibriSpeech test-clean:
 | Measure | Result |
 |---|---|
 | Greedy phoneme error rate (500 utterances, int8) | 14.8 % |
-| Word error rate, complete C++ pipeline, beam 16 (default) | 36.0 % (2,620 utterances) |
-| Word error rate, beam 32 | 32.7 % |
+| Word error rate, complete C++ pipeline, beam 32 (default) | 32.7 % (2,620 utterances) |
+| Word error rate, beam 16 | 36.0 % |
 | TinyTTS → TinySTT round trip (`test_roundtrip`, 4 sentences) | 33 % |
 
 The decoder parameters were tuned on the first 100 test-clean utterances
@@ -91,6 +94,45 @@ The decoder parameters were tuned on the first 100 test-clean utterances
 | Beam 128 instead of 16 | 35.8 % |
 | `word_end_beam = 8` (keeps word-boundary hypotheses) at beam 16 | 34.7 % |
 | + LM weight 0.5, word bonus 0 (now the defaults) | 31.9 % |
+| Default beam raised from 16 to 32 (no measurable time difference on the desktop and the ESP32-P4) | full test-clean 36.0 % → 32.7 % |
+
+### Larger lexicon and language model
+
+100 test-clean utterances, desktop (`research/eval_wer.py`); the LMs are
+derived from the LibriSpeech LM corpus (800 M words) with
+`research/arpa_to_lm.py`:
+
+| Lexicon + LM | Container | Beam 32 | Beam 64 | Beam 128 |
+|---|---:|---:|---:|---:|
+| 25.8 k words + bigram from the training transcripts (shipped) | 3.1 MB | 29.2 % | – | – |
+| 25.8 k words + bigram from `3-gram.pruned.1e-7` | 12.7 MB | 27.3 % | 25.6 % | 25.0 % |
+| 50 k words + bigram from `3-gram.pruned.3e-7` | **9.5 MB** | – | **24.7 %** | 23.5 % |
+| 100 k words + bigram from `3-gram.pruned.1e-7` | 20.9 MB | 25.6 % | – | 22.5 % |
+| 200 k words + bigram from `3-gram.pruned.1e-7` | 26.9 MB | 27.3 % | – | 23.3 % |
+
+On all 2,620 test-clean utterances the 9.5 MB container gives **29.8 %** at
+beam 64, against 32.7 % for the shipped container at beam 32 (the 100
+utterances above happen to profit more).
+
+Pruning bigrams by probability (`--min-logp`) hurts much more than using the
+entropy-pruned ARPA model. Rescoring the 16 best hypotheses with the trigram
+`3-gram.pruned.1e-7` (`research/rescore_nbest.py`) improves the best setup
+only from 22.5 % to 21.7 % (the best hypothesis in the N-best lists would
+give 17.9 %). The voice activity detector does not cost accuracy: with it
+the WER is 28.5 %, without 29.2 % (beam 32, same audio). An utterance longer
+than 15 s ends at its next short pause instead of being cut in the middle of
+a word (29.4 % instead of 30.0 % on the 17 utterances over 15 s).
+
+The 9.5 MB container read in place from the flash partition, on the 10.4 s
+utterance (complete pipeline until the result):
+
+| | Beam 32 | Beam 64 | Beam 128 |
+|---|---:|---:|---:|
+| ESP32-S3 | 4.73 s (0.45 RTF) | 5.35 s (0.51 RTF) | too slow: 11.4 s, frames dropped |
+| ESP32-P4 | 1.64 s (0.16 RTF) | 1.69 s (0.16 RTF) | 3.27 s (0.31 RTF) |
+
+Both transcribe two more words of the test sentence correctly than with the
+shipped container.
 
 Without a language model the WER is 60–80 %. The LM is essential but weak,
 being a bigram from 18,000 training sentences. The Raspberry Pi gives the same

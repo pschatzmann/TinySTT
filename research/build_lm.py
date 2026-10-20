@@ -15,7 +15,7 @@ lm.uni_logp I16 [V], lm.uni_backoff I16 [V], lm.bi_offsets U32 [V+1],
 lm.bi_words U32 (sorted per history), lm.bi_logp I16.
 """
 import argparse
-import collections
+import gzip
 import math
 import os
 import sys
@@ -36,46 +36,71 @@ def lexicon_words(container_path):
     return [text[off[i]:off[i + 1]].decode() for i in range(len(off) - 1)]
 
 
-def build_sections(words, sentences, min_count=2, discount=0.75, unk_count=1.0):
+def count_ngrams(words, sentences, chunk=20_000_000):
+    """Unigram counts [V] and the bigram counts as sorted keys h * V + w.
+
+    Counting runs on numpy arrays in chunks, so that corpora with hundreds of
+    millions of words (the LibriSpeech LM corpus) fit into memory."""
     ids = {w: i for i, w in enumerate(words)}
     V0 = len(words)
     BOS, EOS, UNK = V0, V0 + 1, V0 + 2
     V = V0 + 3
-    uni = collections.Counter()
-    bi = collections.Counter()
+    uni = np.zeros(V, dtype=np.int64)
+    keys = np.zeros(0, dtype=np.int64)
+    counts = np.zeros(0, dtype=np.int64)
+    buf = []
+
+    def flush():
+        nonlocal keys, counts
+        if not buf:
+            return
+        seq = np.concatenate(buf)
+        buf.clear()
+        # pairs within a sentence: the sentences are separated by -1
+        h, w = seq[:-1], seq[1:]
+        ok = (h >= 0) & (w >= 0)
+        h, w = h[ok], w[ok]
+        np.add.at(uni, w, 1)
+        k, c = np.unique(h * V + w, return_counts=True)
+        k, inv = np.unique(np.concatenate([keys, k]), return_inverse=True)
+        merged = np.zeros(len(k), dtype=np.int64)
+        np.add.at(merged, inv, np.concatenate([counts, c]))
+        keys, counts = k, merged
+
+    pending = 0
     for s in sentences:
-        seq = [BOS] + [ids.get(w, UNK) for w in s] + [EOS]
-        uni.update(seq[1:])
-        bi.update(zip(seq[:-1], seq[1:]))
+        seq = np.fromiter((ids.get(w, UNK) for w in s), dtype=np.int64, count=len(s))
+        buf.append(np.concatenate([[BOS], seq, [EOS, -1]]))
+        pending += len(s) + 3
+        if pending >= chunk:
+            flush()
+            pending = 0
+    flush()
+    return V, uni, keys, counts
+
+
+def build_sections(words, sentences, min_count=2, discount=0.75, unk_count=1.0):
+    V, uni, keys, counts = count_ngrams(words, sentences)
+    BOS = len(words)
     # unigram with add-one smoothing over the vocabulary (no <s>)
-    total = sum(uni.values()) + (V - 1)
-    p_uni = np.array([(uni[i] + 1.0) / total for i in range(V)])
+    total = uni.sum() + (V - 1)
+    p_uni = (uni + 1.0) / total
     p_uni[BOS] = 0.0
     p_uni /= p_uni.sum()
-    hist = collections.Counter()
-    for (h, _), c in bi.items():
-        hist[h] += c
-    kept = collections.defaultdict(dict)
-    for (h, w), c in bi.items():
-        if c >= min_count:
-            kept[h][w] = (c - discount) / hist[h]
+    h_all = keys // V
+    hist = np.bincount(h_all, weights=counts, minlength=V)
+    kept = counts >= min_count
+    kh, kw = h_all[kept], keys[kept] % V
+    kp = (counts[kept] - discount) / hist[kh]
     uni_logp = np.full(V, -32.0)
+    uni_logp[p_uni > 0] = np.log(p_uni[p_uni > 0])
     backoff = np.zeros(V)
-    for i in range(V):
-        if p_uni[i] > 0:
-            uni_logp[i] = math.log(p_uni[i])
-    offsets = [0]
-    bw, bl = [], []
-    for h in range(V):
-        succ = kept.get(h, {})
-        if succ:
-            left = 1.0 - sum(succ.values())
-            denom = 1.0 - sum(p_uni[w] for w in succ)
-            backoff[h] = math.log(max(left, 1e-9) / max(denom, 1e-9))
-            for w in sorted(succ):
-                bw.append(w)
-                bl.append(math.log(succ[w]))
-        offsets.append(len(bw))
+    left = 1.0 - np.bincount(kh, weights=kp, minlength=V)
+    denom = 1.0 - np.bincount(kh, weights=p_uni[kw], minlength=V)
+    has = np.bincount(kh, minlength=V) > 0
+    backoff[has] = np.log(np.maximum(left[has], 1e-9) / np.maximum(denom[has], 1e-9))
+    # keys are sorted: by history, then by word
+    offsets = np.concatenate([[0], np.cumsum(np.bincount(kh, minlength=V))])
 
     def q(a):
         return np.clip(np.round(np.asarray(a) * SCALE), -32768, 32767).astype("<i2")
@@ -84,16 +109,21 @@ def build_sections(words, sentences, min_count=2, discount=0.75, unk_count=1.0):
         "lm.config": np.array([VERSION, V, 2, SCALE], dtype="<u4"),
         "lm.uni_logp": q(uni_logp),
         "lm.uni_backoff": q(backoff),
-        "lm.bi_offsets": np.array(offsets, dtype="<u4"),
-        "lm.bi_words": np.array(bw, dtype="<u4"),
-        "lm.bi_logp": q(bl),
+        "lm.bi_offsets": offsets.astype("<u4"),
+        "lm.bi_words": kw.astype("<u4"),
+        "lm.bi_logp": q(np.log(kp)),
     }
 
 
-def sentences_from(paths):
+def sentences_from(paths, max_lines=0):
+    n = 0
     for p in paths:
-        with open(p, encoding="utf-8") as f:
+        opener = gzip.open if p.endswith(".gz") else open
+        with opener(p, "rt", encoding="utf-8") as f:
             for line in f:
+                n += 1
+                if max_lines and n > max_lines:
+                    return
                 text = line.split("\t", 1)[1] if "\t" in line else line
                 words = normalize_words(text)
                 if words:
@@ -105,10 +135,11 @@ def main():
     ap.add_argument("--text-from", nargs="+", required=True, help="manifests or plain text files")
     ap.add_argument("--lexicon", required=True, help="container with lex.* sections")
     ap.add_argument("--min-count", type=int, default=2)
+    ap.add_argument("--max-lines", type=int, default=0, help="read at most this many lines (0: all)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     words = lexicon_words(args.lexicon)
-    sections = build_sections(words, sentences_from(args.text_from), args.min_count)
+    sections = build_sections(words, sentences_from(args.text_from, args.max_lines), args.min_count)
     w = ContainerWriter()
     for name, value in sections.items():
         w.add(name, value)

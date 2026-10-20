@@ -19,6 +19,13 @@ component (see [`platform-esp-idf.md`](platform-esp-idf.md)).
 | Partition scheme | ≥ 4 MB LittleFS/FFat for `/tinystt.tstt`, or a data partition for the model (see below) | same |
 | USB CDC on boot | Disabled when connected through the UART bridge (e.g. CH343): otherwise `Serial` goes to the native USB port | same |
 
+Boards with an audio codec work through audio-tools' `AudioBoardStream`
+(arduino-audio-driver board definitions):
+[`examples/stt_waveshare_p4`](../examples/stt_waveshare_p4) uses the
+Waveshare ESP32-P4-WIFI6 (ES8311 codec, onboard microphone read as 16 kHz mono) with the model compiled
+into the program as a PROGMEM array (`src/TinySTT/data/tinystt_model_data.h`),
+used in place from flash (Flash Size 32MB, partition scheme with a 13 MB app).
+
 The model container can be loaded from a file system into PSRAM, or used in
 place from a flash data partition with `ModelPartition` (memory-mapped, no RAM
 copy). `examples/timing_benchmark/partitions.csv` defines such a partition

@@ -25,7 +25,7 @@ your desktop, and it can be tested there with the
 A trained English model ships in [`data/`](data/README.md): 3.1 MB
 with acoustic model, a 25,814-word lexicon and a bigram language model. On
 LibriSpeech test-clean the complete pipeline reaches a word error rate of
-36 % (beam 16) or 33 % (beam 32). Speech → phonemes runs faster than real
+33 % (beam 32, the default). Speech → phonemes runs faster than real
 time on the ESP32-S3, ESP32-P4, RP2350, Raspberry Pi 4 and the desktop (see
 [Performance](#performance)). See [`docs/limitations.md`](docs/limitations.md)
 for what is still missing.
@@ -71,6 +71,7 @@ stdin. It can also run the two stages as two processes connected by a pipe
 | Example | What it shows |
 |---|---|
 | [`stt_i2s_mic`](examples/stt_i2s_mic) | I2S microphone → `TinySTT` → text on `Serial` |
+| [`stt_waveshare_p4`](examples/stt_waveshare_p4) | Waveshare ESP32-P4-WIFI6: onboard microphone (ES8311) via `AudioBoardStream`, model compiled into the program (PROGMEM) |
 | [`stt_commands`](examples/stt_commands) | Voice commands with a grammar and a minimum confidence |
 | [`stt_phonemes`](examples/stt_phonemes) | Step 1 only: the recognized phonemes printed with `PhonemeOutput` (checks microphone and acoustic model) |
 | [`stt_split_sender`](examples/stt_split_sender) / [`stt_split_receiver`](examples/stt_split_receiver) | The two stages on two devices, connected by a UART |
@@ -129,7 +130,7 @@ documents: [`platform-esp32.md`](docs/platform-esp32.md), [`platform-rp2350.md`]
 inserted words divided by the number of words in the reference transcript
 (lower is better, 0 % is perfect). The phoneme error rate (PER) is the same
 measure on phonemes and rates the acoustic model alone. For the shipped model
-on LibriSpeech test-clean (2,620 utterances): WER 36.0 % with beam 16 (the default) and 32.7 % with beam 32. The
+on LibriSpeech test-clean (2,620 utterances): WER 32.7 % with beam 32 (the default) and 36.0 % with beam 16. The
 same transcripts come out on all platforms (the WER was identical on x86 and
 the Raspberry Pi). Speech synthesized by TinyTTS is transcribed with a WER of
 33 % (2 of 4 test sentences exact).
@@ -160,7 +161,7 @@ lexicon and LM.
 | Acoustic model state and buffers | 14 KB (36 KB with batches of 4) |
 | Features (512-point FFT, 80 mel bands) | ≈ 8 KB |
 | Phoneme queue (64 frames) | 1 KB |
-| Decoder (beam 16, word history) | up to ≈ 30 KB, plus words added at runtime |
+| Decoder (beam 32, word history) | up to ≈ 30 KB, plus words added at runtime |
 | *Optional, for speed:* GRU recurrent weights in internal RAM | 192 – 384 KB |
 | *Optional, for speed:* remaining int8 weights in PSRAM | 0.5 – 0.9 MB |
 | Model container | none if used in place from flash (ESP32 partition, embedded array); 3.1 MB PSRAM if loaded from a file system |
@@ -196,7 +197,7 @@ board settings.
 
 - **The split works.** Speech → Phonemes and Phonemes → Text give identical results in one loop, on two tasks over the SPSC queue, and across a fragmented byte stream between two "devices" (tested).
 - **Microcontrollers are fast enough.** With int8 weights and activations, the production acoustic model (0.9 M parameters, 30 M MAC/s) plus features runs at 0.43 × real time on an ESP32-S3 and 0.16 × on an ESP32-P4 (measured). On the S3 the bottleneck is memory bandwidth, not arithmetic: placing the weights in PSRAM or internal RAM and batching frames mattered more than SIMD alone.
-- **Accuracy is the open front.** The shipped model reaches 36 % WER on LibriSpeech test-clean: usable for commands (grammar mode), not yet for reliable dictation. The biggest gains are expected from a larger language model and from the 38 % of the training data that was skipped because of words missing from the dictionary (see [`docs/training.md`](docs/training.md)).
+- **Accuracy is the open front.** The shipped model reaches 33 % WER on LibriSpeech test-clean: usable for commands (grammar mode), not yet for reliable dictation. The biggest gains are expected from a larger language model and from the 38 % of the training data that was skipped because of words missing from the dictionary (see [`docs/training.md`](docs/training.md)).
 
 See [Performance](#performance) for the measured numbers.
 
