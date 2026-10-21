@@ -28,7 +28,7 @@ code and the measured results:
 
 | Part | Size |
 |---|---:|
-| Program (examples) | 0.1 – 0.2 MB (RP2350), 0.4 – 0.55 MB (ESP32), 1.4 MB with Wi-Fi and HTTPS (ESP32-P4 download example) |
+| Program (examples) | 0.1 – 0.2 MB (RP2350), 0.4 – 0.55 MB (ESP32); plus the model if it is embedded (see [`model-embedding.md`](model-embedding.md)) |
 | Acoustic model (int8) | 0.93 MB |
 | Lexicon (25,814 words) | 1.42 MB |
 | Language model (bigram) | 0.78 MB |
@@ -49,7 +49,7 @@ lexicon and LM.
 | Decoder (beam 32, word history) | up to ≈ 30 KB, plus words added at runtime |
 | *Optional, for speed:* GRU recurrent weights in internal RAM | 192 KB with the default reserve (96 KB internal RAM stay free); 384 KB on the RP2350 with `setInternalRamReserve(48 * 1024)` |
 | *Optional, for speed:* remaining int8 weights in PSRAM | 0.5 – 0.9 MB |
-| Model container | none if used in place from flash (ESP32 partition, PROGMEM array); 3.1 MB (large model: 9.5 MB) PSRAM if loaded from a file system or downloaded |
+| Model container | none if used in place from flash (ESP32 partition, embedded model); 3.1 MB (large model: 9.5 MB) PSRAM if loaded from a file system or downloaded |
 
 Real time on a microcontroller needs about 0.5 MB internal RAM and PSRAM
 (ESP32-S3, ESP32-P4, RP2350 with PSRAM). Without PSRAM the weights are read

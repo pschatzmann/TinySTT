@@ -28,7 +28,7 @@ containers can be built separately and merged with `research/pack.py`.
 
 ```cpp
 ModelContainer model;
-// 1. zero copy from a PROGMEM array or memory-mapped flash (4-byte aligned)
+// 1. zero copy from memory: an embedded model or memory-mapped flash (4-byte aligned)
 model.begin(tinystt_data, tinystt_data_len);
 // 2. from a File / Stream into RAM (PSRAM on ESP32 and RP2350)
 File f = LittleFS.open("/tinystt.tstt", "r");
@@ -38,16 +38,10 @@ ModelPartition partition;
 partition.begin(model, "tinystt");
 ```
 
-To compile a model into the program, create its header (the library does not
-ship them, they are large): `python research/export_header.py` turns every
-model in `data/` into `src/TinySTT/data/<name>_model_data.h`
-(`tinystt_model_data.h`, `tinystt_large_model_data.h`; one container with
-explicit arguments). Then
-`#include "TinySTT/data/tinystt_model_data.h"` and
-`model.begin(tinystt_model_data, tinystt_model_data_len)` (see
-[`model-headers.md`](model-headers.md)). It adds 3.1 MB to
-the program (on ESP32 it is used in place from flash; choose a partition
-scheme with a large app partition). Generated headers are ignored by git.
+To compile a model into the program, run `python research/embed_model.py`
+once; then `#include "TinySTT/data/tinystt_model.h"` and
+`model.begin(tinystt_model, tinystt_model_size())` use it in place from
+flash (see [`model-embedding.md`](model-embedding.md)).
 
 `ModelDownloader` (`TinySTT/ModelDownloader.h`) fetches a container with an
 audio-tools URL stream (e.g. `URLStream`, which also logs into Wi-Fi) into a

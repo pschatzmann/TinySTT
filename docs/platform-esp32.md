@@ -23,10 +23,9 @@ Boards with an audio codec work through audio-tools' `AudioBoardStream`
 (arduino-audio-driver board definitions):
 [`examples/stt_waveshare_p4`](../examples/stt_waveshare_p4) uses the
 Waveshare ESP32-P4-WIFI6 (ES8311 codec, onboard microphone read as 16 kHz
-mono). It downloads the model over Wi-Fi to the TF card once
-(`ModelDownloader` with audio-tools' `URLStream`) and loads it from there
-into PSRAM; by default the large container, decoded with beam 64. With
-Wi-Fi and HTTPS the program is 1.4 MB: partition scheme "Huge APP".
+mono). It compiles the large model into the program
+([`model-embedding.md`](model-embedding.md)) and decodes with beam 64: a
+10.3 MB program, partition scheme "32M Flash (13MB APP/6.75MB SPIFFS)".
 
 The model container can be loaded from a file system into PSRAM, or used in
 place from a flash data partition with `ModelPartition` (memory-mapped, no RAM

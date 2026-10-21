@@ -31,6 +31,43 @@ time on the ESP32-S3, ESP32-P4, RP2350, Raspberry Pi 4 and the desktop (see
 for what is still missing.
 
 
+## Installation
+
+For Arduino, you can download the library as zip and call Sketch → Include
+Library → Add .ZIP Library. Or you can git clone this project into the Arduino
+libraries folder, together with the libraries it depends on:
+
+```bash
+cd ~/Documents/Arduino/libraries
+git clone https://github.com/pschatzmann/TinySTT.git
+git clone https://github.com/pschatzmann/arduino-audio-tools.git
+git clone https://github.com/pschatzmann/arduino-audio-driver.git
+```
+
+[arduino-audio-tools](https://github.com/pschatzmann/arduino-audio-tools) is
+required (2026-10-18 or later);
+[arduino-audio-driver](https://github.com/pschatzmann/arduino-audio-driver)
+is only needed for boards with an audio codec (`AudioBoardStream`, e.g.
+[`stt_waveshare_p4`](examples/stt_waveshare_p4)).
+
+The models in [`data/`](data/README.md) are ready to be compiled into a
+sketch: `#include "TinySTT/data/tinystt_model.h"` (or
+`tinystt_large_model.h`), see [`docs/model-embedding.md`](docs/model-embedding.md).
+Sketches that do not use them do not grow.
+
+This project can also be built and executed on your desktop with cmake
+(tests, the `tinystt` command and the benchmark, see
+[`docs/platform-desktop.md`](docs/platform-desktop.md)):
+
+```bash
+cd TinySTT
+cmake -S . -B build -DTINYSTT_BUILD_TESTS=ON -DTINYSTT_BUILD_DESKTOP=ON
+cmake --build build -j
+ctest --test-dir build
+```
+
+For ESP-IDF see [`docs/platform-esp-idf.md`](docs/platform-esp-idf.md).
+
 ## Usage
 
 `TinySTT` is an audio-tools `AudioOutput`: you write audio into it, and it prints
@@ -43,7 +80,7 @@ needs four objects and two calls:
 2. An FFT object of your choice (e.g. `AudioRealFFT`) and a `ModelContainer`
    with one of the [models](#models) (acoustic model, lexicon and language
    model in one `.tstt` file, loaded from LittleFS or SD, used in place from a
-   flash partition or a PROGMEM array, or downloaded with `ModelDownloader`).
+   flash partition or compiled into the program, or downloaded with `ModelDownloader`).
 3. `TinySTT` itself, constructed with the FFT, the model and the output, and a
    `StreamCopy` from the source to `TinySTT`.
 4. In `setup()`, `TinySTT::begin()` starts the decoder task (on the other core
@@ -82,7 +119,7 @@ The default model fits any board with 4 MB flash or PSRAM; the large one
 needs about 10 MB and runs on the ESP32-S3 and ESP32-P4 (flash and RAM
 figures: [`docs/requirements.md`](docs/requirements.md)). A model is loaded
 from a file system, used in place from flash, compiled into the program
-([`docs/model-headers.md`](docs/model-headers.md)) or downloaded over Wi-Fi
+([`docs/model-embedding.md`](docs/model-embedding.md)) or downloaded over Wi-Fi
 (`ModelDownloader`); see [`docs/model-data.md`](docs/model-data.md). Your own
 vocabulary, language model or grammar: see [`docs/training.md`](docs/training.md).
 
@@ -91,7 +128,7 @@ vocabulary, language model or grammar: see [`docs/training.md`](docs/training.md
 | Example | What it shows |
 |---|---|
 | [`stt_i2s_mic`](examples/stt_i2s_mic) | I2S microphone → `TinySTT` → text on `Serial` |
-| [`stt_waveshare_p4`](examples/stt_waveshare_p4) | Waveshare ESP32-P4-WIFI6: onboard microphone (ES8311) via `AudioBoardStream`; the model is downloaded over Wi-Fi to the TF card once (`ModelDownloader`) and loaded from there |
+| [`stt_waveshare_p4`](examples/stt_waveshare_p4) | Waveshare ESP32-P4-WIFI6: onboard microphone (ES8311) via `AudioBoardStream`, large model compiled into the program (`research/embed_model.py`) |
 | [`stt_commands`](examples/stt_commands) | Voice commands with a grammar and a minimum confidence |
 | [`stt_phonemes`](examples/stt_phonemes) | Step 1 only: the recognized phonemes printed with `PhonemeOutput` (checks microphone and acoustic model) |
 | [`stt_split_sender`](examples/stt_split_sender) / [`stt_split_receiver`](examples/stt_split_receiver) | The two stages on two devices, connected by a UART |
@@ -178,7 +215,7 @@ the decoder tuning and the language model experiments,
 | [`protocol.md`](docs/protocol.md) | `PhonemeFrame` and the wire format that connects two devices. |
 | [`phonemes.md`](docs/phonemes.md) | The 41 model classes (blank, silence, 39 ARPAbet phonemes). |
 | [`model-data.md`](docs/model-data.md) | The `.tstt` model container: sections, loading, sizes. |
-| [`model-headers.md`](docs/model-headers.md) | Compiling a model into the program: creating the PROGMEM headers with `research/export_header.py`. |
+| [`model-embedding.md`](docs/model-embedding.md) | Compiling a model into the program with `research/embed_model.py` (`.incbin`). |
 | [`requirements.md`](docs/requirements.md) | Libraries, boards, memory and board settings. |
 | [`platform-esp32.md`](docs/platform-esp32.md) | Platform: ESP32-S3 and ESP32-P4 (board settings, SIMD kernels, results). |
 | [`platform-rp2350.md`](docs/platform-rp2350.md) | Platform: RP2350 with PSRAM (board settings, DSP kernel, results). |
