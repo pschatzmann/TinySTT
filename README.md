@@ -50,23 +50,9 @@ required (2026-10-18 or later);
 is only needed for boards with an audio codec (`AudioBoardStream`, e.g.
 [`stt_waveshare_p4`](examples/stt_waveshare_p4)).
 
-The models in [`data/`](data/README.md) are ready to be compiled into a
-sketch: `#include "TinySTT/data/tinystt_model.h"` (or
-`tinystt_large_model.h`), see [`docs/model-embedding.md`](docs/model-embedding.md).
-Sketches that do not use them do not grow.
-
-This project can also be built and executed on your desktop with cmake
-(tests, the `tinystt` command and the benchmark, see
-[`docs/platform-desktop.md`](docs/platform-desktop.md)):
-
-```bash
-cd TinySTT
-cmake -S . -B build -DTINYSTT_BUILD_TESTS=ON -DTINYSTT_BUILD_DESKTOP=ON
-cmake --build build -j
-ctest --test-dir build
-```
-
-For ESP-IDF see [`docs/platform-esp-idf.md`](docs/platform-esp-idf.md).
+For the desktop build (tests, the `tinystt` command, the benchmark) see
+[`docs/platform-desktop.md`](docs/platform-desktop.md), for ESP-IDF
+[`docs/platform-esp-idf.md`](docs/platform-esp-idf.md).
 
 ## Usage
 

@@ -11,3 +11,4 @@ tinystt_large_model:
   tinystt_incbin __FILE__
   .global tinystt_large_model_end
 tinystt_large_model_end:
+
