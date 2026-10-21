@@ -23,8 +23,15 @@ Boards with an audio codec work through audio-tools' `AudioBoardStream`
 (arduino-audio-driver board definitions):
 [`examples/stt_waveshare_p4`](../examples/stt_waveshare_p4) uses the
 Waveshare ESP32-P4-WIFI6 (ES8311 codec, onboard microphone read as 16 kHz mono) with the model compiled
-into the program as a PROGMEM array (`src/TinySTT/data/tinystt_model_data.h`),
+into the program as a PROGMEM array (create `src/TinySTT/data/tinystt_model_data.h`
+once with `python research/export_header.py`),
 used in place from flash (Flash Size 32MB, partition scheme with a 13 MB app).
+`#define MODEL_SOURCE` selects other sources: `1` maps
+`data/tinystt_large.tstt` from the flash partition `tinystt` (partition
+scheme "Custom" with the example's `partitions.csv`; write the model once
+with `esptool write-flash 0x310000 data/tinystt_large.tstt`), `2` downloads
+it over Wi-Fi to the TF card once (`ModelDownloader` with audio-tools'
+`URLStream`) and loads it from there into PSRAM. Both decode with beam 64.
 
 The model container can be loaded from a file system into PSRAM, or used in
 place from a flash data partition with `ModelPartition` (memory-mapped, no RAM
@@ -51,6 +58,9 @@ useless for 256-element sums.
 ## Results
 
 ### Complete pipeline with the trained model
+
+Measured with the previous acoustic model (trained on 100 h); the current
+model has the same shape, so time and memory are the same.
 
 `TinySTT` with `data/tinystt.tstt` (lexicon and LM included) in the `tinystt`
 flash partition, on a 10.4 s LibriSpeech test-clean utterance. The time covers

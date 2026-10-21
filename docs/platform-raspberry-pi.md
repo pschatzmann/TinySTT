@@ -46,11 +46,12 @@ words, 5 s of audio, one core, best of 5 runs.
 
 ### Accuracy
 
-The shipped model gives the same word error rate as on x86: 31.9 % on the
-first 100 test-clean utterances. 86 of the 100 transcripts are identical
+The Pi gives the same word error rate as x86: with the previous model 31.9 %
+on the first 100 test-clean utterances. 86 of the 100 transcripts are identical
 character for character; the others differ in close beam decisions caused by
 floating-point details. Decoding these 100 utterances (about 12 minutes of
-audio) with one process start each takes 26 s.
+audio) with one process start each takes 26 s. After the decoder's word history
+pruning the Pi again gave the same transcripts as x86 (86 identical).
 
 ### Correctness
 

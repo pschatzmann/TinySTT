@@ -80,6 +80,10 @@ allocation, and `begin()` can start them again. `TinySTT::end()` first sends
 the end of the current utterance and waits until the decoder has taken it,
 so the last result is printed.
 
+Before a task's code is replaced (at start and restart), TinySTT waits until
+FreeRTOS reports the task as suspended: suspending a task that runs on the
+other core can return before that core has switched it out.
+
 ## Threading options
 
 | Setup | How |

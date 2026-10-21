@@ -25,7 +25,7 @@ ctest --test-dir build --output-on-failure
 | Option | Effect |
 |---|---|
 | `TINYSTT_SANITIZE=address\|thread` | Sanitizer build of the tests. TSan on recent kernels needs `setarch $(uname -m) -R ./build/test/test_queue`. |
-| `TINYSTT_ROUNDTRIP=ON` | TinyTTS → TinySTT round-trip test (needs `../TinyTTS`). Runs when `TINYSTT_MODEL` points to a trained container, e.g. `TINYSTT_MODEL=data/tinystt.tstt`: WER 33 % on 4 synthesized sentences. |
+| `TINYSTT_ROUNDTRIP=ON` | TinyTTS → TinySTT round-trip test (needs `../TinyTTS`). Runs when `TINYSTT_MODEL` points to a trained container, e.g. `TINYSTT_MODEL=data/tinystt.tstt`: WER 20 % on 4 synthesized sentences (3 exact). |
 | `TINYSTT_DESKTOP_MIC=ON` | Live microphone in the CLI (fetches miniaudio). |
 | `TINYSTT_NATIVE=ON` (default) | On ARM Linux: compile for the build machine's CPU (`-mcpu=native`, enables NEON on a 32-bit Raspberry Pi OS). |
 

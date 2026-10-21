@@ -32,4 +32,4 @@ Production shape:
 - queue 1 KB (64 frames);
 - decoder up to about 30 KB (beam and word histories), plus words added at runtime;
 - optional, with `Placement::Auto`: the GRU recurrent matrices in internal RAM (192 KB with the default reserve of 96 KB free internal RAM; 384 KB on the RP2350 with `setInternalRamReserve(48 * 1024)`) and the remaining weights in PSRAM;
-- the model container (3.1 MB with lexicon and LM): used in place from flash, or loaded into PSRAM.
+- the model container (3.1 MB with lexicon and LM, 9.5 MB for the large container): used in place from flash, or loaded into PSRAM.

@@ -80,13 +80,14 @@ The shipped model (`data/tinystt.tstt`), on LibriSpeech test-clean:
 
 | Measure | Result |
 |---|---|
-| Greedy phoneme error rate (500 utterances, int8) | 14.8 % |
-| Word error rate, complete C++ pipeline, beam 32 (default) | 32.7 % (2,620 utterances) |
-| Word error rate, beam 16 | 36.0 % |
-| TinyTTS → TinySTT round trip (`test_roundtrip`, 4 sentences) | 33 % |
+| Greedy phoneme error rate (500 utterances, int8) | 15.0 % |
+| Word error rate, complete C++ pipeline, beam 32 (default) | 29.6 % (2,620 utterances) |
+| Word error rate, `data/tinystt_large.tstt`, beam 64 | **25.7 %** (2,620 utterances) |
+| Previous model (train-clean-100 only), beam 32 / large container | 32.7 % / 29.8 % |
+| TinyTTS → TinySTT round trip (`test_roundtrip`, 4 sentences) | 20 % (3 exact) |
 
-The decoder parameters were tuned on the first 100 test-clean utterances
-(`research/eval_wer.py`):
+The decoder parameters were tuned with the previous model on the first 100
+test-clean utterances (`research/eval_wer.py`):
 
 | Change | WER (100 utterances) |
 |---|---:|
@@ -110,9 +111,10 @@ derived from the LibriSpeech LM corpus (800 M words) with
 | 100 k words + bigram from `3-gram.pruned.1e-7` | 20.9 MB | 25.6 % | – | 22.5 % |
 | 200 k words + bigram from `3-gram.pruned.1e-7` | 26.9 MB | 27.3 % | – | 23.3 % |
 
-On all 2,620 test-clean utterances the 9.5 MB container gives **29.8 %** at
-beam 64, against 32.7 % for the shipped container at beam 32 (the 100
-utterances above happen to profit more).
+These numbers are for the previous acoustic model. On all 2,620 test-clean
+utterances the 9.5 MB container gave 29.8 % at beam 64 against 32.7 %; with
+the current model it gives **25.7 %** against 29.6 % (100 utterances: 21.1 %
+against 27.7 %). It ships as `data/tinystt_large.tstt`.
 
 Pruning bigrams by probability (`--min-logp`) hurts much more than using the
 entropy-pruned ARPA model. Rescoring the 16 best hypotheses with the trigram

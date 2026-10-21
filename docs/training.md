@@ -20,16 +20,22 @@ PER = phoneme error rate, WER = word error rate: (substitutions + deletions +
 insertions) / length of the reference (see
 [`performance.md`](performance.md#accuracy-and-decoder-tuning)).
 
-Trained on a Kaggle T4 in 5.3 hours (30 epochs, the last 3 quantization-aware):
-- dev PER 17.3 %;
-- test-clean greedy PER 14.8 %;
-- WER of the complete pipeline 32.7 % at beam 32, the default (36.0 % at beam 16);
-- TinyTTS → TinySTT round trip (`test_roundtrip`): WER 33 %, 2 of 4 sentences exact.
+Trained on a Kaggle T4 in 9.6 hours: train-clean-100 + train-clean-360 with
+the LibriSpeech lexicon (122,904 utterances, 7 % skipped for very rare
+words), 5 epochs plus 1 quantization-aware epoch (the time budget ended the
+planned 7 epochs early; an epoch takes 85–135 minutes):
 
-It was trained on train-clean-100 only, with CMUdict pronunciations: 10,841 of
-28,539 utterances were skipped because a word is missing from CMUdict. The
-notebook now trains on train-clean-100 + train-clean-360 with the LibriSpeech
-lexicon (retraining in progress).
+| Epoch | 0 | 1 | 2 | 3 | 4 | 5 (QAT) |
+|---|---:|---:|---:|---:|---:|---:|
+| Dev PER | 28.5 % | 22.5 % | 19.8 % | 17.6 % | 16.1 % | 15.2 % |
+
+- test-clean greedy PER 15.0 % (int8);
+- WER of the complete pipeline 29.6 % at beam 32 with `data/tinystt.tstt`, 25.7 % at beam 64 with `data/tinystt_large.tstt`.
+
+The previous model (train-clean-100 only, CMUdict pronunciations: 10,841 of
+28,539 utterances skipped; 30 epochs, dev PER 17.3 %) gave 32.7 % and 29.8 %.
+The dev PER was still falling: more epochs (a second Kaggle session with
+`--resume`) are the next step.
 - **A larger language model** from the LibriSpeech LM corpus (800 M words): without an LM the WER is 60–80 %, so the LM matters a lot.
 
 Use `research/eval_wer.py` to measure the WER of the C++ pipeline on a manifest.

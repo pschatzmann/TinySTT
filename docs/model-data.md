@@ -38,12 +38,29 @@ ModelPartition partition;
 partition.begin(model, "tinystt");
 ```
 
-The shipped model is also available as a PROGMEM array:
-`#include "TinySTT/data/tinystt_model_data.h"`, then
-`model.begin(tinystt_model_data, tinystt_model_data_len)`. It adds 3.1 MB to
+To compile a model into the program, create its header (the library does not
+ship them, they are large): `python research/export_header.py` turns every
+model in `data/` into `src/TinySTT/data/<name>_model_data.h`
+(`tinystt_model_data.h`, `tinystt_large_model_data.h`; one container with
+explicit arguments). Then
+`#include "TinySTT/data/tinystt_model_data.h"` and
+`model.begin(tinystt_model_data, tinystt_model_data_len)` (see
+[`model-headers.md`](model-headers.md)). It adds 3.1 MB to
 the program (on ESP32 it is used in place from flash; choose a partition
-scheme with a large app partition). `research/export_header.py` writes such a
-header for any container.
+scheme with a large app partition). Generated headers are ignored by git.
+
+`ModelDownloader` (`TinySTT/ModelDownloader.h`) fetches a container with an
+audio-tools URL stream (e.g. `URLStream`, which also logs into Wi-Fi) into a
+file on SD, SD_MMC or LittleFS, once: a valid file that is already there is
+kept, and an interrupted download never replaces it.
+
+```cpp
+URLStream url("ssid", "password");
+ModelDownloader downloader(url);
+downloader.download(SD_MMC, "/tinystt_large.tstt", "https://.../tinystt_large.tstt");
+File f = SD_MMC.open("/tinystt_large.tstt", "r");
+model.begin(f, f.size());
+```
 
 `begin()` checks magic, version, sizes and the CRC. Pass `verifyCrc = false`
 for trusted memory-mapped flash to skip the scan.
@@ -53,11 +70,12 @@ for trusted memory-mapped flash to skip the scan.
 | Part | Size |
 |---|---|
 | Acoustic model (production shape, int8) | ≈ 0.95 MB (float32 ≈ 3.6 MB) |
-| Lexicon, 40 k words | ≈ 1.5–2.5 MB |
-| Bigram LM | depends on pruning (`--min-count`), budget ≤ 4 MB |
+| Lexicon | 1.42 MB for 25,814 words, 2.6 MB for 50,000 words |
+| Bigram LM | 0.78 MB from the training transcripts, 6.0 MB from the LibriSpeech LM corpus (`3-gram.pruned.3e-7`) |
 
 The trained English model ships as `data/tinystt.tstt` (3.1 MB: acoustic
-model 0.93 MB, 25,814-word lexicon 1.42 MB, bigram LM 0.78 MB; see
-[`../data/README.md`](../data/README.md)). `test/data/placeholder_model.tstt`
+model 0.93 MB, 25,814-word lexicon 1.42 MB, bigram LM 0.78 MB) and as
+`data/tinystt_large.tstt` (9.5 MB: the same acoustic model, 50,000-word
+lexicon, LibriSpeech bigram LM); see [`../data/README.md`](../data/README.md). `test/data/placeholder_model.tstt`
 has random weights, and `test/data/toy_model.tstt` is a toy task, both for
 the tests. See [`training.md`](training.md).

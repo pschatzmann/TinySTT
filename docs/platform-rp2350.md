@@ -44,6 +44,9 @@ is 0), the CS pin is wrong.
 
 ### Complete pipeline with the trained model
 
+Measured with the previous acoustic model (trained on 100 h); the current
+model has the same shape, so time and memory are the same.
+
 `TinySTT` with `data/tinystt.tstt` (lexicon and LM included) on a 10.4 s
 LibriSpeech test-clean utterance, 150 MHz. The time covers features, acoustic
 model and decoder until the result is printed.
