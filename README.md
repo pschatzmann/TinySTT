@@ -16,18 +16,16 @@ The stages exchange only phoneme frames through a lock-free queue. They can
 run in one loop, on two tasks or cores, or on **two different devices**
 connected by a serial line, UDP or ESP-NOW. All audio, FFT and concurrency
 functionality comes from
-[arduino-audio-tools](https://github.com/pschatzmann/arduino-audio-tools).
-Every model stage is plain hand-written C++, with no TFLite or other
+[arduino-audio-tools](https://github.com/pschatzmann/arduino-audio-tools)
+(2026-10-18 or later). Every model stage is plain hand-written C++, with no TFLite or other
 inference runtime. Like TinyTTS, it also builds as a command line program for
 your desktop, and it can be tested there with the
 [Arduino-Emulator](https://github.com/pschatzmann/Arduino-Emulator).
 
-A trained English model ships in [`data/`](data/README.md): 3.1 MB
-with acoustic model (trained on 460 h of LibriSpeech), a 25,814-word lexicon
-and a bigram language model, plus a 9.5 MB variant with a 50,000-word
-lexicon and a larger language model. On
-LibriSpeech test-clean the complete pipeline reaches a word error rate of
-30 % (beam 32), or 26 % with the 9.5 MB large container (beam 64). Speech → phonemes runs faster than real
+Trained English models ship in [`data/`](data/README.md) (see
+[Models](#models)). On LibriSpeech test-clean the complete pipeline reaches a
+word error rate of 30 % with the 3.1 MB default model, or 26 % with the
+9.5 MB large model (see [Accuracy](#accuracy)). Speech → phonemes runs faster than real
 time on the ESP32-S3, ESP32-P4, RP2350, Raspberry Pi 4 and the desktop (see
 [Performance](#performance)). See [`docs/limitations.md`](docs/limitations.md)
 for what is still missing.
@@ -43,8 +41,9 @@ needs four objects and two calls:
    16 bit and started with its `begin()`. Any audio-tools stream works; for other
    formats put a `FormatConverterStream` in front.
 2. An FFT object of your choice (e.g. `AudioRealFFT`) and a `ModelContainer`
-   with the model data (acoustic model, lexicon, language model in one `.tstt`
-   file, loaded from LittleFS, SD or a flash partition).
+   with one of the [models](#models) (acoustic model, lexicon and language
+   model in one `.tstt` file, loaded from LittleFS or SD, used in place from a
+   flash partition or a PROGMEM array, or downloaded with `ModelDownloader`).
 3. `TinySTT` itself, constructed with the FFT, the model and the output, and a
    `StreamCopy` from the source to `TinySTT`.
 4. In `setup()`, `TinySTT::begin()` starts the decoder task (on the other core
@@ -68,12 +67,31 @@ On the desktop, the `tinystt` command transcribes WAV files or raw audio from
 stdin. It can also run the two stages as two processes connected by a pipe
 (see [`docs/platform-desktop.md`](docs/platform-desktop.md)).
 
+## Models
+
+The models in [`data/`](data/README.md) share the same acoustic model (0.9 M
+parameters, int8, trained on 460 h of LibriSpeech) and differ in vocabulary
+and language model:
+
+| File | Size | Lexicon | Language model | Beam | WER (LibriSpeech test-clean) |
+|---|---:|---|---|---:|---:|
+| `data/tinystt.tstt` | 3.1 MB | 25,814 words (CMUdict) | bigram from the training transcripts | 32 (default) | 29.6 % |
+| `data/tinystt_large.tstt` | 9.5 MB | 50,000 words (LibriSpeech lexicon) | bigram from the LibriSpeech LM corpus (800 M words) | 64 | **25.7 %** |
+
+The default model fits any board with 4 MB flash or PSRAM; the large one
+needs about 10 MB and runs on the ESP32-S3 and ESP32-P4 (flash and RAM
+figures: [`docs/requirements.md`](docs/requirements.md)). A model is loaded
+from a file system, used in place from flash, compiled into the program
+([`docs/model-headers.md`](docs/model-headers.md)) or downloaded over Wi-Fi
+(`ModelDownloader`); see [`docs/model-data.md`](docs/model-data.md). Your own
+vocabulary, language model or grammar: see [`docs/training.md`](docs/training.md).
+
 ## Examples
 
 | Example | What it shows |
 |---|---|
 | [`stt_i2s_mic`](examples/stt_i2s_mic) | I2S microphone → `TinySTT` → text on `Serial` |
-| [`stt_waveshare_p4`](examples/stt_waveshare_p4) | Waveshare ESP32-P4-WIFI6: onboard microphone (ES8311) via `AudioBoardStream`; default model compiled into the program (PROGMEM header created with `research/export_header.py`), the large model from a flash partition, or downloaded over Wi-Fi to the TF card (`MODEL_SOURCE`) |
+| [`stt_waveshare_p4`](examples/stt_waveshare_p4) | Waveshare ESP32-P4-WIFI6: onboard microphone (ES8311) via `AudioBoardStream`; the model is downloaded over Wi-Fi to the TF card once (`ModelDownloader`) and loaded from there |
 | [`stt_commands`](examples/stt_commands) | Voice commands with a grammar and a minimum confidence |
 | [`stt_phonemes`](examples/stt_phonemes) | Step 1 only: the recognized phonemes printed with `PhonemeOutput` (checks microphone and acoustic model) |
 | [`stt_split_sender`](examples/stt_split_sender) / [`stt_split_receiver`](examples/stt_split_receiver) | The two stages on two devices, connected by a UART |
@@ -128,53 +146,29 @@ settings, detailed measurements and how to reproduce them are in the platform
 documents: [`platform-esp32.md`](docs/platform-esp32.md), [`platform-rp2350.md`](docs/platform-rp2350.md),
 [`platform-raspberry-pi.md`](docs/platform-raspberry-pi.md) and [`platform-desktop.md`](docs/platform-desktop.md).
 
-**Accuracy** is given as word error rate (WER): the substituted, deleted and
-inserted words divided by the number of words in the reference transcript
-(lower is better, 0 % is perfect). The phoneme error rate (PER) is the same
-measure on phonemes and rates the acoustic model alone. For the shipped model
-on LibriSpeech test-clean (2,620 utterances): WER 29.6 % with beam 32 (the default) and 25.7 % with `data/tinystt_large.tstt` (50k words, LibriSpeech LM) at beam 64. The
-same transcripts come out on all platforms (the WER was identical on x86 and
-the Raspberry Pi). Speech synthesized by TinyTTS is transcribed with a WER of
-20 % (3 of 4 test sentences exact).
-On the ESP32-S3, ESP32-P4 and RP2350, `TinySTT` with the shipped model
-transcribed a 10.4 s LibriSpeech utterance exactly like the desktop, with the
-complete pipeline (decoder included) at 0.44, 0.16 and 0.97 RTF.
+## Accuracy
 
-## Requirements
+Measured on LibriSpeech test-clean (2,620 utterances, read English speech)
+with the complete C++ pipeline:
 
-**Flash (PROGMEM):**
+| Model | Beam | Word error rate | Phoneme error rate (acoustic model, greedy) |
+|---|---:|---:|---:|
+| `data/tinystt.tstt` (3.1 MB) | 32 (default) | 29.6 % | 15.0 % |
+| `data/tinystt_large.tstt` (9.5 MB) | 64 | **25.7 %** | 15.0 % |
 
-| Part | Size |
-|---|---:|
-| Program (examples) | 0.1 – 0.2 MB (RP2350), 0.4 – 0.55 MB (ESP32) |
-| Acoustic model (int8) | 0.93 MB |
-| Lexicon (25,814 words) | 1.42 MB |
-| Language model (bigram) | 0.78 MB |
-| **Total for free dictation** | **≈ 3.7 MB** |
-| *Large container instead:* 50k-word lexicon (2.6 MB) + LibriSpeech bigram LM (6.0 MB) | 9.5 MB with the acoustic model; total ≈ 10 MB |
+The word error rate (WER) is the number of substituted, deleted and inserted
+words divided by the number of words in the reference transcript (lower is
+better, 0 % is perfect). The phoneme error rate (PER) is the same measure on
+phonemes and rates the acoustic model alone; both models share it.
 
-With a command grammar instead of free dictation, the language model is not
-needed. A split sender needs only the acoustic model, and the receiver only
-lexicon and LM.
+- **The same on every platform:** the WER was identical on x86 and the Raspberry Pi. On the ESP32-S3, ESP32-P4 and RP2350, `TinySTT` with `data/tinystt.tstt` transcribed a 10.4 s LibriSpeech utterance exactly like the desktop, with the complete pipeline (decoder included) at 0.44, 0.16 and 0.97 RTF.
+- **Synthesized speech:** speech from TinyTTS is transcribed with a WER of 20 % (3 of 4 test sentences exact).
+- **Progress:** the first model (100 h of training data, small lexicon and LM, beam 16) had 36 %. Beam 32, 460 h of training data and the large lexicon and LM brought it to 26 %.
+- **Commands:** with a grammar instead of the language model, only the words of the grammar can be recognized, which is far more reliable for voice control (see [`examples/stt_commands`](examples/stt_commands)).
 
-**RAM:**
-
-| Part | Size |
-|---|---:|
-| Acoustic model state and buffers | 14 KB (36 KB with batches of 4) |
-| Features (512-point FFT, 80 mel bands) | ≈ 8 KB |
-| Phoneme queue (64 frames) | 1 KB |
-| Decoder (beam 32, word history) | up to ≈ 30 KB, plus words added at runtime |
-| *Optional, for speed:* GRU recurrent weights in internal RAM | 192 – 384 KB |
-| *Optional, for speed:* remaining int8 weights in PSRAM | 0.5 – 0.9 MB |
-| Model container | none if used in place from flash (ESP32 partition, embedded array); 3.1 MB (large: 9.5 MB) PSRAM if loaded from a file system |
-
-Real time on a microcontroller needs about 0.5 MB internal RAM and PSRAM
-(ESP32-S3, ESP32-P4, RP2350 with PSRAM). Without PSRAM the weights are read
-from flash, which works but is slower. TinySTT needs
-[arduino-audio-tools](https://github.com/pschatzmann/arduino-audio-tools) from
-2026-10-18 or later. See [`docs/requirements.md`](docs/requirements.md) for
-board settings.
+[`docs/performance.md`](docs/performance.md#accuracy-and-decoder-tuning) has
+the decoder tuning and the language model experiments,
+[`docs/training.md`](docs/training.md) the training results.
 
 ## Documentation
 
@@ -191,7 +185,7 @@ board settings.
 | [`platform-raspberry-pi.md`](docs/platform-raspberry-pi.md) | Platform: Raspberry Pi with Linux (build, NEON kernel, results). |
 | [`platform-desktop.md`](docs/platform-desktop.md) | Platform: desktop (build, tests, the `tinystt` command, benchmark, results). |
 | [`platform-esp-idf.md`](docs/platform-esp-idf.md) | Using TinySTT as an ESP-IDF component. |
-| [`data/`](data/README.md) | The shipped English model containers (default and large) and their accuracy. |
+| [`data/`](data/README.md) | The shipped English models (default and large) and their accuracy. |
 | [`training.md`](docs/training.md) | Training the acoustic model (Kaggle notebook, Docker), building lexicon and LM. |
 | [`research.md`](docs/research.md) | The Python tooling in `research/`. |
 | [`performance.md`](docs/performance.md) | Comparison of all platforms, shared optimizations, accuracy and decoder tuning. |
@@ -201,7 +195,7 @@ board settings.
 
 - **The split works.** Speech → Phonemes and Phonemes → Text give identical results in one loop, on two tasks over the SPSC queue, and across a fragmented byte stream between two "devices" (tested).
 - **Microcontrollers are fast enough.** With int8 weights and activations, the production acoustic model (0.9 M parameters, 30 M MAC/s) plus features runs at 0.43 × real time on an ESP32-S3 and 0.16 × on an ESP32-P4 (measured). On the S3 the bottleneck is memory bandwidth, not arithmetic: placing the weights in PSRAM or internal RAM and batching frames mattered more than SIMD alone.
-- **Accuracy is the open front.** The shipped model reaches 30 % WER on LibriSpeech test-clean (26 % with the large container): usable for commands (grammar mode), not yet for reliable dictation. Training on 460 h instead of 100 h and the larger lexicon and language model brought it from 33 % to 26 %; the dev error rate was still falling when the training stopped, so more epochs are the next step (see [`docs/training.md`](docs/training.md)).
+- **Accuracy is the open front.** The default model reaches 30 % WER on LibriSpeech test-clean, the large model 26 %: usable for commands (grammar mode), not yet for reliable dictation. Training on 460 h instead of 100 h and the larger lexicon and language model brought it from 33 % to 26 %; the dev error rate was still falling when the training stopped, so more epochs are the next step (see [`docs/training.md`](docs/training.md)).
 
 See [Performance](#performance) for the measured numbers.
 

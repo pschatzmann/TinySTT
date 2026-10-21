@@ -32,8 +32,7 @@ The array is 16 byte aligned (the SIMD kernels read the int8 weights in
 place) and marked with `TINYSTT_PROGMEM` (see `src/TinySTT/DataAttr.h`). On
 ESP32 it stays in flash and is used in place, without a RAM copy. The model
 adds its size to the program: choose a partition scheme with a large app
-partition, e.g. "32M Flash (13MB APP/6.75MB SPIFFS)" on the ESP32-P4
-(see [`examples/stt_waveshare_p4`](../examples/stt_waveshare_p4)).
+partition, e.g. "32M Flash (13MB APP/6.75MB SPIFFS)" on the ESP32-P4.
 
 For the other ways to load a model (file system, flash partition, download)
 see [`model-data.md`](model-data.md).
